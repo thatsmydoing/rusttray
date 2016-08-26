@@ -4,3 +4,6 @@ version = "0.1.0"
 authors = ["Thomas Dy <thatsmydoing@gmail.com>"]
 
 [dependencies]
+xcb = "0.7.5"
+chan = "0.1.18"
+chan-signal = "0.1.6"
