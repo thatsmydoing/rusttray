@@ -1,0 +1,6 @@
+[package]
+name = "rustray"
+version = "0.1.0"
+authors = ["Thomas Dy <thatsmydoing@gmail.com>"]
+
+[dependencies]
