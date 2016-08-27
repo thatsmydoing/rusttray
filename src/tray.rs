@@ -25,7 +25,8 @@ pub struct Tray<'a> {
     icon_size: u16,
     position: Position,
     window: xcb::Window,
-    children: Vec<xcb::Window>
+    children: Vec<xcb::Window>,
+    timestamp: xcb::Timestamp
 }
 
 impl<'a> Tray<'a> {
@@ -43,7 +44,8 @@ impl<'a> Tray<'a> {
             icon_size: icon_size,
             position: position,
             window: conn.generate_id(),
-            children: vec![]
+            children: vec![],
+            timestamp: 0
         }
     }
 
@@ -82,7 +84,22 @@ impl<'a> Tray<'a> {
         let selection = self.atoms.get(atom::_NET_SYSTEM_TRAY_S0);
         xcb::set_selection_owner(self.conn, self.window, selection, timestamp);
         let owner = xcb::get_selection_owner(self.conn, selection).get_reply().unwrap().owner();
-        owner == self.window
+        let ok = owner == self.window;
+        if ok {
+            self.timestamp = timestamp;
+            let setup = self.conn.get_setup();
+            let screen = setup.roots().nth(self.screen).unwrap();
+
+            let client_event = xcb::ClientMessageEvent::new(
+                32, // 32 bits (refers to data)
+                screen.root(),
+                self.atoms.get(atom::MANAGER),
+                xcb::ClientMessageData::from_data32([timestamp, selection, self.window, 0, 0])
+            );
+            xcb::send_event(self.conn, false, screen.root(), xcb::EVENT_MASK_STRUCTURE_NOTIFY, &client_event);
+            self.conn.flush();
+        }
+        ok
     }
 
     pub fn adopt(&mut self, window: xcb::Window) {
@@ -92,6 +109,7 @@ impl<'a> Tray<'a> {
         ]);
         xcb::reparent_window(self.conn, window, self.window, offset, 0);
         xcb::map_window(self.conn, window);
+        self.force_size(window);
         self.conn.flush();
         self.children.push(window);
         self.reposition();
@@ -147,6 +165,9 @@ impl<'a> Tray<'a> {
             xcb::unmap_window(self.conn, *child);
             xcb::reparent_window(self.conn, *child, root, 0, 0);
         }
+
+        let selection = self.atoms.get(atom::_NET_SYSTEM_TRAY_S0);
+        xcb::set_selection_owner(self.conn, xcb::NONE, selection, self.timestamp);
         self.conn.flush();
     }
 }

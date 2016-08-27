@@ -12,7 +12,8 @@ macro_rules! atoms {
 atoms!(
     _NET_SYSTEM_TRAY_S0,
     _NET_WM_WINDOW_TYPE,
-    _NET_WM_WINDOW_TYPE_DOCK
+    _NET_WM_WINDOW_TYPE_DOCK,
+    MANAGER
 );
 
 pub struct Atoms<'a> {
