@@ -4,6 +4,7 @@ extern crate chan_signal;
 extern crate xcb;
 
 mod atom;
+mod event;
 mod tray;
 
 use std::thread;
@@ -22,34 +23,32 @@ fn main() {
             return
         }
 
-        let tray = tray::Tray::new(&conn, &atoms, preferred as usize);
+        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize);
         tray.create();
         if !tray.take_selection() {
             println!("Could not take ownership of tray selection. Maybe another tray is also running?");
             return
         }
 
+        let (tx, rx) = chan::sync::<event::Event>(0);
         {
             let conn = conn.clone();
-            const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
             thread::spawn(move || {
-                loop {
-                    match conn.wait_for_event() {
-                        Some(event) => match event.response_type() {
-                            xcb::EXPOSE => { println!("expose") },
-                            CLIENT_MESSAGE => {
-                                println!("client message");
-                            },
-                            _ => {}
-                        },
-                        None => { break; }
-                    }
-                }
+                event::event_loop(&conn, tx);
             });
         }
 
         loop {
+            use event::Event::*;
             chan_select!(
+                rx.recv() -> event => match event.unwrap() {
+                    ChildRequest(window) => {
+                        tray.adopt(window);
+                    },
+                    ChildDestroyed(window) => {
+                        tray.forget(window);
+                    }
+                },
                 signal.recv() => {
                     break;
                 }
@@ -57,6 +56,7 @@ fn main() {
         }
 
         // cleanup code
+        tray.cleanup();
     }
     else {
         println!("Could not connect to X server!");
