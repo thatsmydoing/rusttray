@@ -63,14 +63,24 @@ impl<'a> Tray<'a> {
             screen.root_visual(),
             &[
                 (xcb::CW_BACK_PIXEL, screen.black_pixel()),
-                (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_EXPOSURE)
+                (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_PROPERTY_CHANGE)
             ]
         );
+        xcb::change_property(
+            self.conn,
+            xcb::PROP_MODE_REPLACE as u8,
+            self.window,
+            self.atoms.get(atom::_NET_WM_WINDOW_TYPE),
+            xcb::ATOM_ATOM,
+            32,
+            &[self.atoms.get(atom::_NET_WM_WINDOW_TYPE_DOCK)]
+        );
+        self.conn.flush();
     }
 
-    pub fn take_selection(&self) -> bool {
+    pub fn take_selection(&mut self, timestamp: xcb::Timestamp) -> bool {
         let selection = self.atoms.get(atom::_NET_SYSTEM_TRAY_S0);
-        xcb::set_selection_owner(self.conn, self.window, selection, xcb::CURRENT_TIME);
+        xcb::set_selection_owner(self.conn, self.window, selection, timestamp);
         let owner = xcb::get_selection_owner(self.conn, selection).get_reply().unwrap().owner();
         owner == self.window
     }

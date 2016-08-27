@@ -2,6 +2,7 @@ use chan;
 use xcb;
 
 pub enum Event {
+    Ready(xcb::Timestamp),
     ChildRequest(xcb::Window),
     ChildDestroyed(xcb::Window),
     ChildConfigured(xcb::Window)
@@ -10,10 +11,15 @@ pub enum Event {
 const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
 
 pub fn event_loop(conn: &xcb::Connection, tx: chan::Sender<Event>) {
+    let mut ready = false;
     loop {
         match conn.wait_for_event() {
             Some(event) => match event.response_type() {
-                xcb::EXPOSE => { println!("expose") },
+                xcb::PROPERTY_NOTIFY if !ready => {
+                    ready = true;
+                    let event: &xcb::PropertyNotifyEvent = xcb::cast_event(&event);
+                    tx.send(Event::Ready(event.time()));
+                },
                 CLIENT_MESSAGE => {
                     let event: &xcb::ClientMessageEvent = xcb::cast_event(&event);
                     let data = event.data().data32();

@@ -32,11 +32,6 @@ fn main() {
         };
 
         let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, 20, dir);
-        tray.create();
-        if !tray.take_selection() {
-            println!("Could not take ownership of tray selection. Maybe another tray is also running?");
-            return
-        }
 
         let (tx, rx) = chan::sync::<event::Event>(0);
         {
@@ -46,10 +41,18 @@ fn main() {
             });
         }
 
+        tray.create();
+
         loop {
             use event::Event::*;
             chan_select!(
                 rx.recv() -> event => match event.unwrap() {
+                    Ready(timestamp) => {
+                        if !tray.take_selection(timestamp) {
+                            println!("Could not take ownership of tray selection. Maybe another tray is also running?");
+                            return
+                        }
+                    },
                     ChildRequest(window) => {
                         tray.adopt(window);
                     },
