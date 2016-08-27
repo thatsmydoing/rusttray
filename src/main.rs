@@ -5,7 +5,6 @@ extern crate getopts;
 extern crate xcb;
 
 mod atom;
-mod event;
 mod tray;
 
 use std::env;
@@ -17,6 +16,8 @@ const PROGRAM: &'static str = "rustray";
 const EXIT_WRONG_ARGS: i32 = 1;
 const EXIT_FAILED_CONNECT: i32 = 10;
 const EXIT_FAILED_SELECT: i32 = 11;
+
+const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
 
 fn main() {
     process::exit(real_main());
@@ -74,34 +75,50 @@ fn real_main() -> i32 {
             return EXIT_FAILED_SELECT
         }
 
-        let (tx, rx) = chan::sync::<event::Event>(0);
+        let (tx, rx) = chan::sync(0);
         {
             let conn = conn.clone();
             thread::spawn(move || {
-                event::event_loop(&conn, tx);
+                loop {
+                    match conn.wait_for_event() {
+                        Some(event) => { tx.send(event); },
+                        None => { break; }
+                    }
+                }
             });
         }
 
         tray.create();
 
+        let mut ready = false;
         loop {
-            use event::Event::*;
             chan_select!(
-                rx.recv() -> event => match event.unwrap() {
-                    Ready(timestamp) => {
-                        if !tray.take_selection(timestamp) {
-                            println!("Could not take ownership of tray selection. Maybe another tray is also running?");
-                            return EXIT_FAILED_SELECT
-                        }
-                    },
-                    ChildRequest(window) => {
-                        tray.adopt(window);
-                    },
-                    ChildDestroyed(window) => {
-                        tray.forget(window);
-                    },
-                    ChildConfigured(window, width, height) => {
-                        tray.force_size(window, Some((width, height)));
+                rx.recv() -> event => {
+                    let event = event.unwrap();
+                    match event.response_type() {
+                        xcb::PROPERTY_NOTIFY if !ready => {
+                            ready = true;
+                            let event: &xcb::PropertyNotifyEvent = xcb::cast_event(&event);
+                            if !tray.take_selection(event.time()) {
+                                println!("Could not take ownership of tray selection. Maybe another tray is also running?");
+                                return EXIT_FAILED_SELECT
+                            }
+                        },
+                        CLIENT_MESSAGE => {
+                            let event: &xcb::ClientMessageEvent = xcb::cast_event(&event);
+                            let data = event.data().data32();
+                            let window = data[2];
+                            tray.adopt(window);
+                        },
+                        xcb::DESTROY_NOTIFY => {
+                            let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
+                            tray.forget(event.window());
+                        },
+                        xcb::CONFIGURE_NOTIFY => {
+                            let event: &xcb::ConfigureNotifyEvent = xcb::cast_event(&event);
+                            tray.force_size(event.window(), Some((event.width(), event.height())));
+                        },
+                        _ => {}
                     }
                 },
                 signal.recv() => {
