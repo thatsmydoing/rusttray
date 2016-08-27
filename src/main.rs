@@ -3,6 +3,8 @@ extern crate chan;
 extern crate chan_signal;
 extern crate xcb;
 
+mod atom;
+
 use std::thread;
 use std::sync::Arc;
 
@@ -11,9 +13,16 @@ fn main() {
 
     if let Ok((conn, preferred)) = xcb::Connection::connect(None) {
         let conn = Arc::new(conn);
+        let atoms = atom::Atoms::new(&conn);
 
         let setup = conn.get_setup();
         let screen = setup.roots().nth(preferred as usize).unwrap();
+
+        let owner = xcb::get_selection_owner(&conn, atoms.get(&atom::_NET_SYSTEM_TRAY_S0)).get_reply().unwrap().owner();
+        if owner != xcb::NONE {
+            println!("Another system tray is already running");
+            return
+        }
 
         let window = conn.generate_id();
         xcb::create_window(
