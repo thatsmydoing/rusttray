@@ -1,4 +1,4 @@
-# rustray
+# rusttray
 
 A rudimentary system tray implemented in Rust.
 
@@ -7,7 +7,7 @@ primarily wrote it to understand how the system tray mechanics work in X. This
 doesn't actually implement all of the system tray specification but it works for
 most of the programs I use.
 
-rustray only implements XEMBED style icons. The tray icons themselves perform
+rusttray only implements XEMBED style icons. The tray icons themselves perform
 the drawing and the tray only manages their sizes and positions. It does not
 draw icons by itself. In addition, balloon messages are not handled as well.
 

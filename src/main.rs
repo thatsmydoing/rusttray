@@ -12,7 +12,7 @@ use std::process;
 use std::thread;
 use std::sync::Arc;
 
-const PROGRAM: &'static str = "rustray";
+const PROGRAM: &'static str = "rusttray";
 const EXIT_WRONG_ARGS: i32 = 1;
 const EXIT_FAILED_CONNECT: i32 = 10;
 const EXIT_FAILED_SELECT: i32 = 11;
