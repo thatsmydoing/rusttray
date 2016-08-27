@@ -211,6 +211,12 @@ impl<'a> Tray<'a> {
                 let window = data[2];
                 self.adopt(window);
             },
+            xcb::REPARENT_NOTIFY => {
+                let event: &xcb::ReparentNotifyEvent = xcb::cast_event(&event);
+                if event.parent() != self.window {
+                    self.forget(event.window());
+                }
+            },
             xcb::DESTROY_NOTIFY => {
                 let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
                 self.forget(event.window());
