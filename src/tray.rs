@@ -72,16 +72,37 @@ impl<'a> Tray<'a> {
                 (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_PROPERTY_CHANGE)
             ]
         );
-        xcb::change_property(
-            self.conn,
-            xcb::PROP_MODE_REPLACE as u8,
-            self.window,
+        self.set_property(
             self.atoms.get(atom::_NET_WM_WINDOW_TYPE),
             xcb::ATOM_ATOM,
             32,
             &[self.atoms.get(atom::_NET_WM_WINDOW_TYPE_DOCK)]
         );
+        self.set_property(
+            xcb::ATOM_WM_NAME,
+            xcb::ATOM_STRING,
+            8,
+            ::PROGRAM.as_bytes()
+        );
+        self.set_property(
+            xcb::ATOM_WM_CLASS,
+            xcb::ATOM_STRING,
+            8,
+            format!("{0}\0{0}", ::PROGRAM).as_bytes()
+        );
         self.conn.flush();
+    }
+
+    pub fn set_property<T>(&self, name: xcb::Atom, type_: xcb::Atom, format: u8, data: &[T]) {
+        xcb::change_property(
+            self.conn,
+            xcb::PROP_MODE_REPLACE as u8,
+            self.window,
+            name,
+            type_,
+            format,
+            data
+        );
     }
 
     pub fn is_selection_available(&self) -> bool {
