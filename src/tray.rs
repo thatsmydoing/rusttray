@@ -115,7 +115,7 @@ impl<'a> Tray<'a> {
         ]);
         xcb::reparent_window(self.conn, window, self.window, offset, 0);
         xcb::map_window(self.conn, window);
-        self.force_size(window);
+        self.force_size(window, None);
         self.conn.flush();
         self.children.push(window);
         self.reposition();
@@ -126,12 +126,18 @@ impl<'a> Tray<'a> {
         self.reposition();
     }
 
-    pub fn force_size(&self, window: xcb::Window) {
-        xcb::configure_window(self.conn, window, &[
-            (xcb::CONFIG_WINDOW_WIDTH as u16, self.icon_size as u32),
-            (xcb::CONFIG_WINDOW_HEIGHT as u16, self.icon_size as u32)
-        ]);
-        self.conn.flush();
+    pub fn force_size(&self, window: xcb::Window, dimensions: Option<(u16, u16)>) {
+        let dimensions = dimensions.unwrap_or_else(|| {
+            let geometry = xcb::get_geometry(self.conn, window).get_reply().unwrap();
+            (geometry.width(), geometry.height())
+        });
+        if dimensions != (self.icon_size, self.icon_size) {
+            xcb::configure_window(self.conn, window, &[
+                (xcb::CONFIG_WINDOW_WIDTH as u16, self.icon_size as u32),
+                (xcb::CONFIG_WINDOW_HEIGHT as u16, self.icon_size as u32)
+            ]);
+            self.conn.flush();
+        }
     }
 
     pub fn reposition(&self) {

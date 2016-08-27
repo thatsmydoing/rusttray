@@ -100,8 +100,8 @@ fn real_main() -> i32 {
                     ChildDestroyed(window) => {
                         tray.forget(window);
                     },
-                    ChildConfigured(window) => {
-                        tray.force_size(window);
+                    ChildConfigured(window, width, height) => {
+                        tray.force_size(window, Some((width, height)));
                     }
                 },
                 signal.recv() => {

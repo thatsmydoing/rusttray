@@ -5,7 +5,7 @@ pub enum Event {
     Ready(xcb::Timestamp),
     ChildRequest(xcb::Window),
     ChildDestroyed(xcb::Window),
-    ChildConfigured(xcb::Window)
+    ChildConfigured(xcb::Window, u16, u16)
 }
 
 const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
@@ -32,7 +32,7 @@ pub fn event_loop(conn: &xcb::Connection, tx: chan::Sender<Event>) {
                 },
                 xcb::CONFIGURE_NOTIFY => {
                     let event: &xcb::ConfigureNotifyEvent = xcb::cast_event(&event);
-                    tx.send(Event::ChildConfigured(event.window()));
+                    tx.send(Event::ChildConfigured(event.window(), event.width(), event.height()));
                 },
                 _ => {}
             },
