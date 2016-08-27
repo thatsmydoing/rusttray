@@ -80,6 +80,12 @@ impl<'a> Tray<'a> {
         self.conn.flush();
     }
 
+    pub fn is_selection_available(&self) -> bool {
+        let selection = self.atoms.get(atom::_NET_SYSTEM_TRAY_S0);
+        let owner = xcb::get_selection_owner(self.conn, selection).get_reply().unwrap().owner();
+        owner == xcb::NONE
+    }
+
     pub fn take_selection(&mut self, timestamp: xcb::Timestamp) -> bool {
         let selection = self.atoms.get(atom::_NET_SYSTEM_TRAY_S0);
         xcb::set_selection_owner(self.conn, self.window, selection, timestamp);

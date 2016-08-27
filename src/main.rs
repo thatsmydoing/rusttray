@@ -17,12 +17,6 @@ fn main() {
         let conn = Arc::new(conn);
         let atoms = atom::Atoms::new(&conn);
 
-        let owner = xcb::get_selection_owner(&conn, atoms.get(atom::_NET_SYSTEM_TRAY_S0)).get_reply().unwrap().owner();
-        if owner != xcb::NONE {
-            println!("Another system tray is already running");
-            return
-        }
-
         let dir = "top-right";
         let dir = match dir {
             "top-right" => tray::TOP_RIGHT,
@@ -32,6 +26,11 @@ fn main() {
         };
 
         let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, 20, dir);
+
+        if !tray.is_selection_available() {
+            println!("Another system tray is already running");
+            return
+        }
 
         let (tx, rx) = chan::sync::<event::Event>(0);
         {
