@@ -90,6 +90,12 @@ impl<'a> Tray<'a> {
             8,
             format!("{0}\0{0}", ::PROGRAM).as_bytes()
         );
+        self.set_property(
+            self.atoms.get(atom::_NET_SYSTEM_TRAY_ORIENTATION),
+            xcb::ATOM_CARDINAL,
+            32,
+            &[0 as u32] // 0 is horizontal, 1 is vertical
+        );
         self.conn.flush();
     }
 
