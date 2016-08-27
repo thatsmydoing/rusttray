@@ -17,8 +17,6 @@ const EXIT_WRONG_ARGS: i32 = 1;
 const EXIT_FAILED_CONNECT: i32 = 10;
 const EXIT_FAILED_SELECT: i32 = 11;
 
-const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
-
 fn main() {
     process::exit(real_main());
 }
@@ -90,46 +88,18 @@ fn real_main() -> i32 {
 
         tray.create();
 
-        let mut ready = false;
         loop {
             chan_select!(
                 rx.recv() -> event => {
-                    let event = event.unwrap();
-                    match event.response_type() {
-                        xcb::PROPERTY_NOTIFY if !ready => {
-                            ready = true;
-                            let event: &xcb::PropertyNotifyEvent = xcb::cast_event(&event);
-                            if !tray.take_selection(event.time()) {
-                                println!("Could not take ownership of tray selection. Maybe another tray is also running?");
-                                return EXIT_FAILED_SELECT
-                            }
-                        },
-                        CLIENT_MESSAGE => {
-                            let event: &xcb::ClientMessageEvent = xcb::cast_event(&event);
-                            let data = event.data().data32();
-                            let window = data[2];
-                            tray.adopt(window);
-                        },
-                        xcb::DESTROY_NOTIFY => {
-                            let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
-                            tray.forget(event.window());
-                        },
-                        xcb::CONFIGURE_NOTIFY => {
-                            let event: &xcb::ConfigureNotifyEvent = xcb::cast_event(&event);
-                            tray.force_size(event.window(), Some((event.width(), event.height())));
-                        },
-                        _ => {}
+                    if let Some(code) = tray.handle_event(event.unwrap()) {
+                        return code
                     }
                 },
                 signal.recv() => {
-                    break;
+                    tray.finish();
                 }
             );
         }
-
-        // cleanup code
-        tray.cleanup();
-        return 0
     }
     else {
         println!("Could not connect to X server!");

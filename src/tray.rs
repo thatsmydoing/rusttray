@@ -18,6 +18,8 @@ pub const TOP_RIGHT: Position = (VerticalAlign::Top, HorizontalAlign::Right);
 pub const BOTTOM_LEFT: Position = (VerticalAlign::Bottom, HorizontalAlign::Left);
 pub const BOTTOM_RIGHT: Position = (VerticalAlign::Bottom, HorizontalAlign::Right);
 
+const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
+
 pub struct Tray<'a> {
     conn: &'a xcb::Connection,
     atoms: &'a atom::Atoms<'a>,
@@ -26,7 +28,8 @@ pub struct Tray<'a> {
     position: Position,
     window: xcb::Window,
     children: Vec<xcb::Window>,
-    timestamp: xcb::Timestamp
+    timestamp: xcb::Timestamp,
+    finishing: bool
 }
 
 impl<'a> Tray<'a> {
@@ -45,7 +48,8 @@ impl<'a> Tray<'a> {
             position: position,
             window: conn.generate_id(),
             children: vec![],
-            timestamp: 0
+            timestamp: 0,
+            finishing: false
         }
     }
 
@@ -168,7 +172,8 @@ impl<'a> Tray<'a> {
         self.conn.flush();
     }
 
-    pub fn cleanup(&mut self) {
+    pub fn finish(&mut self) {
+        self.finishing = true;
         let setup = self.conn.get_setup();
         let screen = setup.roots().nth(self.screen).unwrap();
         let root = screen.root();
@@ -180,21 +185,62 @@ impl<'a> Tray<'a> {
         }
         xcb::destroy_window(self.conn, self.window);
         self.conn.flush();
+    }
 
-        // wait for all children to finish reparenting or destroyed
-        loop {
-            let event = self.conn.wait_for_event().unwrap();
-            if event.response_type() == xcb::REPARENT_NOTIFY {
+    pub fn handle_event(&mut self, event: xcb::GenericEvent) -> Option<i32> {
+        if self.finishing {
+            self.handle_event_finishing(event)
+        }
+        else {
+            self.handle_event_normal(event)
+        }
+    }
+
+    fn handle_event_normal(&mut self, event: xcb::GenericEvent) -> Option<i32> {
+        match event.response_type() {
+            xcb::PROPERTY_NOTIFY if self.timestamp == 0 => {
+                let event: &xcb::PropertyNotifyEvent = xcb::cast_event(&event);
+                if !self.take_selection(event.time()) {
+                    println!("Could not take ownership of tray selection. Maybe another tray is also running?");
+                    return Some(::EXIT_FAILED_SELECT)
+                }
+            },
+            CLIENT_MESSAGE => {
+                let event: &xcb::ClientMessageEvent = xcb::cast_event(&event);
+                let data = event.data().data32();
+                let window = data[2];
+                self.adopt(window);
+            },
+            xcb::DESTROY_NOTIFY => {
+                let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
+                self.forget(event.window());
+            },
+            xcb::CONFIGURE_NOTIFY => {
+                let event: &xcb::ConfigureNotifyEvent = xcb::cast_event(&event);
+                self.force_size(event.window(), Some((event.width(), event.height())));
+            },
+            _ => {}
+        }
+        None
+    }
+
+    fn handle_event_finishing(&mut self, event: xcb::GenericEvent) -> Option<i32> {
+        match event.response_type() {
+            xcb::REPARENT_NOTIFY => {
                 let event: &xcb::ReparentNotifyEvent = xcb::cast_event(&event);
                 self.children.retain(|child| *child != event.window());
-            }
-            if event.response_type() == xcb::DESTROY_NOTIFY {
+            },
+            xcb::DESTROY_NOTIFY => {
                 let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
                 self.children.retain(|child| *child != event.window());
-            }
-            if self.children.is_empty() {
-                break;
-            }
+            },
+            _ => {}
+        }
+        if self.children.is_empty() {
+            Some(0)
+        }
+        else {
+            None
         }
     }
 }
