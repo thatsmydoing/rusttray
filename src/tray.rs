@@ -180,9 +180,15 @@ impl<'a> Tray<'a> {
 
         for child in self.children.iter() {
             let window = *child;
+            xcb::change_window_attributes(self.conn, window, &[
+                (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_NO_EVENT)
+            ]);
             xcb::unmap_window(self.conn, window);
             xcb::reparent_window(self.conn, window, root, 0, 0);
         }
+        xcb::change_window_attributes(self.conn, self.window, &[
+            (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_STRUCTURE_NOTIFY)
+        ]);
         xcb::destroy_window(self.conn, self.window);
         self.conn.flush();
     }
@@ -234,22 +240,12 @@ impl<'a> Tray<'a> {
     }
 
     fn handle_event_finishing(&mut self, event: xcb::GenericEvent) -> Option<i32> {
-        match event.response_type() {
-            xcb::REPARENT_NOTIFY => {
-                let event: &xcb::ReparentNotifyEvent = xcb::cast_event(&event);
-                self.children.retain(|child| *child != event.window());
-            },
-            xcb::DESTROY_NOTIFY => {
-                let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
-                self.children.retain(|child| *child != event.window());
-            },
-            _ => {}
+        if event.response_type() == xcb::DESTROY_NOTIFY {
+            let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
+            if event.window() == self.window {
+                return Some(0)
+            }
         }
-        if self.children.is_empty() {
-            Some(0)
-        }
-        else {
-            None
-        }
+        None
     }
 }
