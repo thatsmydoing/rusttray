@@ -168,18 +168,33 @@ impl<'a> Tray<'a> {
         self.conn.flush();
     }
 
-    pub fn cleanup(&self) {
+    pub fn cleanup(&mut self) {
         let setup = self.conn.get_setup();
         let screen = setup.roots().nth(self.screen).unwrap();
         let root = screen.root();
 
         for child in self.children.iter() {
-            xcb::unmap_window(self.conn, *child);
-            xcb::reparent_window(self.conn, *child, root, 0, 0);
+            let window = *child;
+            xcb::unmap_window(self.conn, window);
+            xcb::reparent_window(self.conn, window, root, 0, 0);
         }
-
-        let selection = self.atoms.get(atom::_NET_SYSTEM_TRAY_S0);
-        xcb::set_selection_owner(self.conn, xcb::NONE, selection, self.timestamp);
+        xcb::destroy_window(self.conn, self.window);
         self.conn.flush();
+
+        // wait for all children to finish reparenting or destroyed
+        loop {
+            let event = self.conn.wait_for_event().unwrap();
+            if event.response_type() == xcb::REPARENT_NOTIFY {
+                let event: &xcb::ReparentNotifyEvent = xcb::cast_event(&event);
+                self.children.retain(|child| *child != event.window());
+            }
+            if event.response_type() == xcb::DESTROY_NOTIFY {
+                let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
+                self.children.retain(|child| *child != event.window());
+            }
+            if self.children.is_empty() {
+                break;
+            }
+        }
     }
 }
