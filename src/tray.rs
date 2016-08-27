@@ -18,7 +18,11 @@ pub const TOP_RIGHT: Position = (VerticalAlign::Top, HorizontalAlign::Right);
 pub const BOTTOM_LEFT: Position = (VerticalAlign::Bottom, HorizontalAlign::Left);
 pub const BOTTOM_RIGHT: Position = (VerticalAlign::Bottom, HorizontalAlign::Right);
 
-const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
+const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80; // 0x80 flag for client messages
+
+const SYSTEM_TRAY_REQUEST_DOCK: u32 = 0;
+const SYSTEM_TRAY_BEGIN_MESSAGE: u32 = 1;
+const SYSTEM_TRAY_CANCEL_MESSAGE: u32 = 2;
 
 pub struct Tray<'a> {
     conn: &'a xcb::Connection,
@@ -240,9 +244,19 @@ impl<'a> Tray<'a> {
             },
             CLIENT_MESSAGE => {
                 let event: &xcb::ClientMessageEvent = xcb::cast_event(&event);
-                let data = event.data().data32();
-                let window = data[2];
-                self.adopt(window);
+                if event.type_() == self.atoms.get(atom::_NET_SYSTEM_TRAY_OPCODE) {
+                    let data = event.data().data32();
+                    let opcode = data[1];
+                    let window = data[2];
+                    match opcode {
+                        SYSTEM_TRAY_REQUEST_DOCK => {
+                            self.adopt(window);
+                        },
+                        SYSTEM_TRAY_BEGIN_MESSAGE => {},
+                        SYSTEM_TRAY_CANCEL_MESSAGE => {},
+                        _ => { unreachable!("Invalid opcode") }
+                    }
+                }
             },
             xcb::REPARENT_NOTIFY => {
                 let event: &xcb::ReparentNotifyEvent = xcb::cast_event(&event);
