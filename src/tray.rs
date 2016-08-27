@@ -225,6 +225,9 @@ impl<'a> Tray<'a> {
                 let event: &xcb::ConfigureNotifyEvent = xcb::cast_event(&event);
                 self.force_size(event.window(), Some((event.width(), event.height())));
             },
+            xcb::SELECTION_CLEAR => {
+                self.finish();
+            },
             _ => {}
         }
         None
