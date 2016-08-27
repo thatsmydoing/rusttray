@@ -4,6 +4,7 @@ extern crate chan_signal;
 extern crate xcb;
 
 mod atom;
+mod tray;
 
 use std::thread;
 use std::sync::Arc;
@@ -15,41 +16,30 @@ fn main() {
         let conn = Arc::new(conn);
         let atoms = atom::Atoms::new(&conn);
 
-        let setup = conn.get_setup();
-        let screen = setup.roots().nth(preferred as usize).unwrap();
-
-        let owner = xcb::get_selection_owner(&conn, atoms.get(&atom::_NET_SYSTEM_TRAY_S0)).get_reply().unwrap().owner();
+        let owner = xcb::get_selection_owner(&conn, atoms.get(atom::_NET_SYSTEM_TRAY_S0)).get_reply().unwrap().owner();
         if owner != xcb::NONE {
             println!("Another system tray is already running");
             return
         }
 
-        let window = conn.generate_id();
-        xcb::create_window(
-            &conn,
-            xcb::COPY_FROM_PARENT as u8,
-            window,
-            screen.root(),
-            0, 0,
-            20, 20,
-            0,
-            xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
-            screen.root_visual(),
-            &[
-                (xcb::CW_BACK_PIXEL, screen.black_pixel()),
-                (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_EXPOSURE)
-            ]
-        );
-        xcb::map_window(&conn, window);
-        conn.flush();
+        let tray = tray::Tray::new(&conn, &atoms, preferred as usize);
+        tray.create();
+        if !tray.take_selection() {
+            println!("Could not take ownership of tray selection. Maybe another tray is also running?");
+            return
+        }
 
         {
             let conn = conn.clone();
+            const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
             thread::spawn(move || {
                 loop {
                     match conn.wait_for_event() {
                         Some(event) => match event.response_type() {
                             xcb::EXPOSE => { println!("expose") },
+                            CLIENT_MESSAGE => {
+                                println!("client message");
+                            },
                             _ => {}
                         },
                         None => { break; }
@@ -67,8 +57,6 @@ fn main() {
         }
 
         // cleanup code
-        xcb::destroy_window(&conn, window);
-        conn.flush();
     }
     else {
         println!("Could not connect to X server!");
