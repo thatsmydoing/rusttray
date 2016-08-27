@@ -23,7 +23,15 @@ fn main() {
             return
         }
 
-        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, 20);
+        let dir = "top-right";
+        let dir = match dir {
+            "top-right" => tray::TOP_RIGHT,
+            "bottom-left" => tray::BOTTOM_LEFT,
+            "bottom-right" => tray::BOTTOM_RIGHT,
+            _ => tray::TOP_LEFT
+        };
+
+        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, 20, dir);
         tray.create();
         if !tray.take_selection() {
             println!("Could not take ownership of tray selection. Maybe another tray is also running?");
