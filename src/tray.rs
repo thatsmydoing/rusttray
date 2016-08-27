@@ -5,16 +5,18 @@ pub struct Tray<'a> {
     conn: &'a xcb::Connection,
     atoms: &'a atom::Atoms<'a>,
     screen: usize,
+    icon_size: u16,
     window: xcb::Window,
     children: Vec<xcb::Window>
 }
 
 impl<'a> Tray<'a> {
-    pub fn new<'b>(conn: &'b xcb::Connection, atoms: &'b atom::Atoms, screen: usize) -> Tray<'b> {
+    pub fn new<'b>(conn: &'b xcb::Connection, atoms: &'b atom::Atoms, screen: usize, icon_size: u16) -> Tray<'b> {
         Tray::<'b> {
             conn: conn,
             atoms: atoms,
             screen: screen,
+            icon_size: icon_size,
             window: conn.generate_id(),
             children: vec![]
         }
@@ -30,7 +32,7 @@ impl<'a> Tray<'a> {
             self.window,
             screen.root(),
             0, 0,
-            20, 20,
+            self.icon_size, self.icon_size,
             0,
             xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
             screen.root_visual(),
@@ -49,7 +51,7 @@ impl<'a> Tray<'a> {
     }
 
     pub fn adopt(&mut self, window: xcb::Window) {
-        let offset = (self.children.len() * 20) as i16;
+        let offset = (self.children.len() as u16 * self.icon_size) as i16;
         xcb::change_window_attributes(self.conn, window, &[
             (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_STRUCTURE_NOTIFY)
         ]);
@@ -65,11 +67,19 @@ impl<'a> Tray<'a> {
         self.resize();
     }
 
+    pub fn force_size(&self, window: xcb::Window) {
+        xcb::configure_window(self.conn, window, &[
+            (xcb::CONFIG_WINDOW_WIDTH as u16, self.icon_size as u32),
+            (xcb::CONFIG_WINDOW_HEIGHT as u16, self.icon_size as u32)
+        ]);
+        self.conn.flush();
+    }
+
     pub fn resize(&self) {
-        let len = self.children.len();
+        let len = self.children.len() as u16;
         if len > 0 {
             xcb::configure_window(self.conn, self.window, &[
-                (xcb::CONFIG_WINDOW_WIDTH as u16, (len * 20) as u32)
+                (xcb::CONFIG_WINDOW_WIDTH as u16, (len * self.icon_size) as u32)
             ]);
             xcb::map_window(self.conn, self.window);
         }

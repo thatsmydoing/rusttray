@@ -3,7 +3,8 @@ use xcb;
 
 pub enum Event {
     ChildRequest(xcb::Window),
-    ChildDestroyed(xcb::Window)
+    ChildDestroyed(xcb::Window),
+    ChildConfigured(xcb::Window)
 }
 
 const CLIENT_MESSAGE: u8 = xcb::CLIENT_MESSAGE | 0x80;
@@ -22,6 +23,10 @@ pub fn event_loop(conn: &xcb::Connection, tx: chan::Sender<Event>) {
                 xcb::DESTROY_NOTIFY => {
                     let event: &xcb::DestroyNotifyEvent = xcb::cast_event(&event);
                     tx.send(Event::ChildDestroyed(event.window()));
+                },
+                xcb::CONFIGURE_NOTIFY => {
+                    let event: &xcb::ConfigureNotifyEvent = xcb::cast_event(&event);
+                    tx.send(Event::ChildConfigured(event.window()));
                 },
                 _ => {}
             },

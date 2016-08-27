@@ -23,7 +23,7 @@ fn main() {
             return
         }
 
-        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize);
+        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, 20);
         tray.create();
         if !tray.take_selection() {
             println!("Could not take ownership of tray selection. Maybe another tray is also running?");
@@ -47,6 +47,9 @@ fn main() {
                     },
                     ChildDestroyed(window) => {
                         tray.forget(window);
+                    },
+                    ChildConfigured(window) => {
+                        tray.force_size(window);
                     }
                 },
                 signal.recv() => {
