@@ -158,6 +158,13 @@ impl<'a> Tray<'a> {
 
     pub fn forget(&mut self, window: xcb::Window) {
         self.children.retain(|child| *child != window);
+        for (index, child) in self.children.iter().enumerate() {
+            let window = *child;
+            let xpos = index as u32 * self.icon_size as u32;
+            xcb::configure_window(&self.conn, window, &[
+                (xcb::CONFIG_WINDOW_X as u16, xpos)
+            ]);
+        }
         self.reposition();
     }
 
