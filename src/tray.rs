@@ -30,6 +30,7 @@ pub struct Tray<'a> {
     screen: usize,
     icon_size: u16,
     position: Position,
+    bg: u32,
     window: xcb::Window,
     children: Vec<xcb::Window>,
     timestamp: xcb::Timestamp,
@@ -42,7 +43,8 @@ impl<'a> Tray<'a> {
         atoms: &'b atom::Atoms,
         screen: usize,
         icon_size: u16,
-        position: Position
+        position: Position,
+        bg: u32
     ) -> Tray<'b> {
         Tray::<'b> {
             conn: conn,
@@ -50,6 +52,7 @@ impl<'a> Tray<'a> {
             screen: screen,
             icon_size: icon_size,
             position: position,
+            bg: bg,
             window: conn.generate_id(),
             children: vec![],
             timestamp: 0,
@@ -72,7 +75,7 @@ impl<'a> Tray<'a> {
             xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
             screen.root_visual(),
             &[
-                (xcb::CW_BACK_PIXEL, screen.black_pixel()),
+                (xcb::CW_BACK_PIXEL, self.bg),
                 (xcb::CW_EVENT_MASK, xcb::EVENT_MASK_PROPERTY_CHANGE)
             ]
         );

@@ -7,6 +7,7 @@ authors = ["Thomas Dy <thatsmydoing@gmail.com>"]
 chan = "0.1.18"
 chan-signal = "0.1.6"
 getopts = "0.2"
+css-color-parser = "*"
 
 [dependencies.xcb]
 version = "0.7.5"

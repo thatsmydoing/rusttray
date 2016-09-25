@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate chan;
 extern crate chan_signal;
+extern crate css_color_parser;
 extern crate getopts;
 extern crate xcb;
 
 mod atom;
 mod tray;
+
+use css_color_parser::Color;
 
 use std::env;
 use std::process;
@@ -28,6 +31,7 @@ fn real_main() -> i32 {
     let mut opts = getopts::Options::new();
     opts.optopt("i", "icon-size", "size of the tray icons, default 20", "<size>");
     opts.optopt("p", "position", "position of the tray, one of: top-left, top-right, bottom-left, bottom-right", "<pos>");
+    opts.optopt("b", "background", "background color of the tray", "<color>");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -61,12 +65,25 @@ fn real_main() -> i32 {
         },
         None => 20
     };
+    let black = Color { r: 0, g: 0, b: 0, a: 1.0 };
+    let bg = matches.opt_str("b");
+    let bg = match bg {
+        Some(color) => match color.parse::<Color>() {
+            Ok(color) => color,
+            Err(e) => {
+                println!("Invalid color specified, {}.", e.to_string());
+                return EXIT_WRONG_ARGS
+            }
+        },
+        None => black
+    };
+    let bg = ((bg.a * 255.0) as u32) << 24 | (bg.r as u32) << 16 | (bg.g as u32) << 8 | (bg.b as u32);
 
     if let Ok((conn, preferred)) = xcb::Connection::connect(None) {
         let conn = Arc::new(conn);
         let atoms = atom::Atoms::new(&conn);
 
-        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, size, pos);
+        let mut tray = tray::Tray::new(&conn, &atoms, preferred as usize, size, pos, bg);
 
         if !tray.is_selection_available() {
             println!("Another system tray is already running");
